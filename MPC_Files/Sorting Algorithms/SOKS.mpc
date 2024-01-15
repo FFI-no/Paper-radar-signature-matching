@@ -1,0 +1,33 @@
+n = 100
+k = 5
+
+A = sint.Tensor([n, 3])
+A.assign_all(0)
+
+
+# Assign k elements to be non-zero
+A[18] = 18
+A[45] = 45
+A[69] = 69
+A[71] = 71
+A[89] = 89
+
+#Sorting Algorithm
+def SOKS(A):
+	B = A.transpose()[0]
+	C = sint.Tensor((k, 3))
+	
+	B.sort(n_threads = 1, batcher = True)
+	@for_range(start = 0, stop = k)
+	def _(i):
+		count = MemValue(n - 1 - i)
+		@map_sum_opt(1, n, [sint, sint, sint])
+		def summer(j):
+			return ( ( B[count] == j ) * A[j][:] )[:]
+
+		C[i] = summer()
+	return C
+
+C = SOKS(A)
+
+C.print_reveal_nested()

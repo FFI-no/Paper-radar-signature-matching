@@ -1,0 +1,26 @@
+n = 100
+k = 5
+
+A = sint.Tensor([n, 3])
+A.assign_all(0)
+
+
+# Assign k elements to be non-zero
+A[18] = 18
+A[45] = 45
+A[69] = 69
+A[71] = 71
+A[89] = 89
+
+# Sorting Algorithm using Radix sort
+def ORS(A):
+	C = sint.Tensor((k, 3))
+	A.sort(key_indices = (0), n_bits = 9)
+	@for_range(0, k)
+	def _(j):
+		C[j] = A[n-1-j] 
+	
+	return C
+C = ORS(A)
+
+C.print_reveal_nested()

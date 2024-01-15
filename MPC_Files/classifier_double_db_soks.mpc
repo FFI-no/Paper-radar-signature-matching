@@ -1,0 +1,120 @@
+# WARNING: This file has not been updated.
+
+# Run all commands from the MP-SPDZ folder
+# Compiling: ./compile.py -F 22 classifier_double_db_soks
+# Run P0: ./mascot-party.x -p 0 -N 3 -IF sommer23/Demo/Inputs/Input classifier_double_db_soks          Input from sommer23/Demo/Inputs/Input-P0-0
+# Run P1: ./mascot-party.x -p 1 -N 3 -IF sommer23/Demo/Inputs/Input-Double classifier_double_db_soks   Input from sommer23/Demo/Inputs/Input-Double-P1-0
+# Run P2: ./mascot-party.x -p 2 -N 3 -IF sommer23/Demo/Inputs/Input-Double classifier_double_db_soks   Input from sommer23/Demo/Inputs/Input-Double-P2-0
+
+sfix.set_precision(5, 70)
+
+# P0 measurement
+measurement_rf = sint.get_input_from(0)
+measurement_pri = sint.get_input_from(0)
+
+# Fixed values for handling of multiple databases
+# REMEMBER to update the number of databases
+number_of_databases = 2
+size_of_largest_database = 45
+n = total_number_of_signatures = 89
+number_of_features = 7   # [signature, rf, pri, cov_11, cov_12, cov_21, cov_22]
+
+# SOKS implementation
+def summer(A, Bcount, j):
+        min = sint(0) + (j >= 1) + (j >= 66)
+        return ( ( (Bcount - min) == j ) * A[j][:] )
+
+def SOKS(A):
+        #A.print_reveal_nested()
+        B = A.transpose()[0]
+        C = sint.Tensor((10, 3))
+
+        B.sort(batcher = True, n_bits = 8)
+#       B.sort(batcher = True)
+        @for_range_opt(10)
+        def _(i):
+                count = n - i - 1
+                Bcount = B[count]
+                @for_range_opt(n)
+                def _(j):
+                        C[i][:] += summer(A, Bcount, j) 
+
+        return C
+
+# WARNING ALL LOOPS RUN ON CLEAR INTEGERS
+# Add sizes for new databases
+# REMEMBER to add the size of the new database
+size_of_databases = cint.Array(number_of_databases)
+size_of_databases[0] = 45
+size_of_databases[1] = 44
+
+def contained(measurement_rf, measurement_pri, mean_rf, mean_pri):
+	"""
+	Checking if measurement is inside rectangular box
+	"""
+	counter = sint(0)	
+	counter += (measurement_pri <= mean_pri+9400)
+	counter += (measurement_pri >= mean_pri-9400)
+	counter += (measurement_rf <= mean_rf+30000)
+	counter += (measurement_rf >= mean_rf-30000)
+	return (counter==4)
+		
+
+# Helping functions for classifier
+
+def mahalanobis_distance(database, measurement_rf, measurement_pri):
+	"""
+	Calculates mahalanobis distance through choleskey decomposition, however we do not perform choleskey decomposition. 
+	"""
+#	database.print_reveal_nested()	
+	y1 = measurement_pri - database[2]
+	y2 = measurement_rf - database[1]
+	
+	gamma = database[3]*(database[6]*database[3]-database[4]**2)	
+	
+	summand_1 = y1**2*(database[6]*database[3]-database[4]**2)
+	summand_2 = database[3]*(y2**2*database[3]-2*y1*y2*database[4])
+	summand_3 = y1**2*database[4]**2
+	
+	gamma_eta = summand_1 + summand_2 + summand_3
+
+	return gamma_eta, gamma	
+	
+	
+# Finds the best cluster for the measurments given a database
+def classify(database, number_of_signatures, measurement_rf, measurement_pri):
+	"""
+	classifying the measurment in given database
+	"""
+#	database.print_reveal_nested()
+	temp = sint.Tensor([total_number_of_signatures, 3])	
+	res = sfix.Tensor([10, 2])
+
+	@for_range(start = 0, stop = number_of_signatures)
+	def _(i):
+#		print_ln_to(0, '%s', i.reveal())
+		mask = contained(measurement_rf, measurement_pri, database[i][1], database[i][2])
+		temp[i][0] = mask * database[i][0]
+
+		ge, g = mahalanobis_distance(database[i], measurement_rf, measurement_pri)
+		
+		temp[i][1] = mask * ge
+		temp[i][2] = mask * g
+	
+	sorted =  SOKS(temp)
+	@for_range(start = 0, stop = 10)
+	def _(j):
+		res[j][0] = sorted[j][0]
+		res[j][1] = sfix(sorted[j][1]) / sfix(sorted[j][2])
+ 		
+	return res
+
+# Collecting all databases into one object
+# Must do this manually
+database1 = sint.input_tensor_from(1, [45, number_of_features])
+database2 = sint.input_tensor_from(2, [44, number_of_features])
+
+databases = database1.concat(database2) 
+
+res = classify(databases, total_number_of_signatures, measurement_rf, measurement_pri)
+res.print_reveal_nested()

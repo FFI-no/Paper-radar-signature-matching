@@ -1,0 +1,85 @@
+# Compiling: ./compile.py -l -F 22 classifier_single_db_ors
+# Run P0: ./mascot-party.x -p 0 -N 2 -IF {path_to_demo}/Signature/Demo/Inputs/Input classifier_single_db_ors
+# Run P1: ./mascot-party.x -p 1 -N 2 -IF {path_to_demo}/Signature/Demo/Inputs/Input-Single classifier_single_db_ors
+
+sfix.set_precision(19, 38)
+
+# P0 measurement
+measurement_rf = sint.get_input_from(0)
+measurement_pri = sint.get_input_from(0)
+
+# Fixed values for handling of multiple databases
+# REMEMBER to update the number of databases
+number_of_databases = 1
+size_of_largest_database = n = 88
+number_of_features = 3   # [signature, rf, pri]
+number_of_coeffs = 3
+
+# WARNING ALL LOOPS RUN ON CLEAR INTEGERS
+# Add sizes for new databases
+# REMEMBER to add the size of the new database
+size_of_databases = cint.Array(number_of_databases)
+size_of_databases[0] = 88
+
+def contained(measurement_rf, measurement_pri, mean_rf, mean_pri):
+	"""
+	Checking if measurement is inside rectangular box
+	"""
+	counter = sint(0)	
+	counter += (measurement_pri <= mean_pri+9400)
+	counter += (measurement_pri >= mean_pri-9400)
+	counter += (measurement_rf <= mean_rf+30000)
+	counter += (measurement_rf >= mean_rf-30000)
+	return (counter==4)
+		
+
+# Helping functions for classifier
+
+def mahalanobis_distance(database, coeff, measurement_rf, measurement_pri):
+	"""
+	Calculates mahalanobis distance through choleskey decomposition, however we do not perform choleskey decomposition. 
+	"""	
+	y1 = measurement_pri - database[2]
+	y2 = measurement_rf - database[1]
+	
+	summand_1 = y1.square() * coeff[0]
+	summand_2 = y2.square() * coeff[1]
+	summand_3 = - 2 * y1 * y2 * coeff[2]
+
+	eta = summand_1 + summand_2 + summand_3
+
+	return eta	
+	
+	
+# Finds the best cluster for the measurments given a database
+def classify(database, coeffs, number_of_signatures, measurement_rf, measurement_pri):
+	"""
+	classifying the measurement in given database
+	"""
+	temp = sint.Array(size_of_largest_database)
+	res = sfix.Tensor([10, 2])
+	
+	@for_range(start = 0, stop = number_of_signatures)
+	def _(i):
+		mask = contained(measurement_rf, measurement_pri, database[i][1], database[i][2])
+		temp[i] = mask * database[i][0]
+	
+	temp.sort(n_bits=8)
+	candidates = temp.reveal()
+
+	@for_range(start = 0, stop = 10)
+	def _(k):
+		counter = size_of_largest_database-k-1
+		if candidates[counter] != 0:
+			res[k][0] = candidates[counter]
+			res[k][1] = mahalanobis_distance(database[candidates[counter]-1], coeffs[candidates[counter]-1], measurement_rf, measurement_pri)
+		
+	return res
+
+database = sint.input_tensor_from(1, [n, number_of_features])
+coeffs = sfix.input_tensor_from(1, [n, number_of_coeffs])
+
+res = classify(database, coeffs, n, measurement_rf, measurement_pri)
+
+# Shows the best result to the measurement
+res.print_reveal_nested()
