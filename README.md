@@ -1,6 +1,6 @@
 # Private detection and classification of radar signals
 
-This project is still very much in a beta phase, any reports of improvements and problems in the MPC code is highly appreciated.
+Any reports of improvements and problems in the MPC code is highly appreciated.
 
 The work was primarily carried out by FFI summer interns Mathias Karsrud Nordal (NTNU) and Benjamin Hansen Mortensen (UiO), with help and follow-up work by Martin Strand (FFI).
 
