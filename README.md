@@ -14,6 +14,7 @@ chmod u+x SETUP.sh
 ./SETUP.sh
 ```
 to automatically compile the MPC files and install the necessary Python packages. You might want to open a virtual environment before installing the Python packages.
+
 5. Execute `python demo_v1.py` to run the demonstration.
 
 ## Known issues
